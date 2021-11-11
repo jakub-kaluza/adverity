@@ -77,12 +77,12 @@ WSGI_APPLICATION = "adverity.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql_psycopg2",
-        "NAME": "starwars",
-        "USER": "sw_app",
+        "NAME": os.environ["DB_NAME"],
+        "USER": os.environ["DB_USER"],
         # Should be a docker secret
-        "PASSWORD": "123456",
-        "HOST": "db",
-        "PORT": "5432",
+        "PASSWORD": os.environ["DB_PASSWORD"],
+        "HOST": ("db" if not os.environ.get("DB_HOST") else os.environ["DB_HOST"]),
+        "PORT": os.environ["DB_PORT"],
     }
 }
 
@@ -130,3 +130,16 @@ STATIC_URL = "/static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 DATA_PATH = os.environ["DATA_PATH"]
+USED_KEYS = [
+    "homeworld",
+    "gender",
+    "mass",
+    "height",
+    "hair_color",
+    "skin_color",
+    "eye_color",
+    "birth_year",
+    "name",
+]
+
+VALID_AGGREGATION_KEYS = ["homeworld", "mass", "height", "gender"]

@@ -1,33 +1,46 @@
 from django.test import TestCase
 
 # Create your tests here.
-from utils.tools import download_dataset, get_aggregated_data
+from utils.tools import get_aggregated_data, SwapiClient
 from django.conf import settings
-from django.urls import reverse
 from .models import Metadata
 
 import datetime
 import os
+from unittest.mock import MagicMock
+from pathlib import Path
 
+class SwapiClientTest(TestCase):
+    def setUp(self):
+        DATA_PATH = "/data/"
+        self.client = SwapiClient(DATA_PATH, ["homeworld", "name"])
 
-class DownloadTests(TestCase):
-    def test_download_succeeds(self):
-        dataset_path = download_dataset(settings.DATA_PATH)
-        exists = os.path.exists(dataset_path)
-        self.assertIs(exists, True)
-        size = os.path.getsize(dataset_path)
-        self.assertGreater(size, 0)
-        os.remove(dataset_path)
+    def test__filter_planet_numbers(self):
+        characters = self.client._filter_planet_numbers(
+            characters=[{"name": "Luke", "homeworld": 1}], planet_dict={1: "Tatooine"}
+        )
+        self.assertEqual(characters[0]["homeworld"], "Tatooine")
+
+    def test__save_dataset(self):
+        characters = [{"name": "Leia Oregana"}, {"name": "Luke Skywalker"}]
+        self.client._save_dataset("./1234.csv", characters)
+        self.assertEqual(os.path.exists("./1234.csv"), True)
+        os.remove("./1234.csv")
 
 
 class AggregateTests(TestCase):
+    def setUp(self):
+        DATA_PATH = "/data/"
+        self.client = SwapiClient(DATA_PATH, ["homeworld", "name", "gender"])
+        characters = [
+            {"name": "Leia Oregana", "homeworld": "Tatooine", "gender": "female"},
+            {"name": "Luke Skywalker", "homeworld": "Tatooine", "gender": "male"},
+        ]
+        self.client._save_dataset("./1234.csv", characters)
+
     def test_aggregate_succeeds(self):
-        dataset_path = download_dataset(settings.DATA_PATH)
-        rows = get_aggregated_data(
-            settings.DATA_PATH, dataset_path.name, keys=["homeworld"]
-        )
-        self.assertEqual(len(rows), 50)
-        os.remove(dataset_path)
+        rows = get_aggregated_data("./", "1234.csv", keys=["homeworld"])
+        self.assertEqual(len(rows), 2)
 
 
 class CollectionsViewTests(TestCase):
@@ -53,27 +66,44 @@ class CollectionDetail(TestCase):
             filename=filename, download_date=datetime.datetime.now()
         )
 
-    def test_collection_contains_Luke_and_Obi(self):
-        dataset_path = download_dataset(settings.DATA_PATH)
-        self._create_metadata(dataset_path.name)
+    def setUp(self):
+        self.DATA_PATH = Path(settings.DATA_PATH)
+        self.swapi_client = SwapiClient(self.DATA_PATH, ["homeworld", "name", "gender"])
+        characters = [
+            {"name": "Leia Oregana", "homeworld": "Tatooine", "gender": "female"},
+            {"name": "Luke Skywalker", "homeworld": "Tatooine", "gender": "male"},
+        ]
+        self.swapi_client._save_dataset(self.DATA_PATH / "1234.csv", characters)
+
+    def test_collection_contains_Luke(self): 
+        self._create_metadata("1234.csv")
         response = self.client.get(
-            "/starwars_explorer/collections/" + dataset_path.name + "/"
+            "/starwars_explorer/collections/1234.csv/"
         )
         self.assertContains(response, "Luke")
-        self.assertContains(response, "Obi")
-        os.remove(dataset_path)
+
+    def tearDown(self):
+        os.remove(self.DATA_PATH / "1234.csv")
 
 class AggregateView(TestCase):
+    def setUp(self):
+        self.DATA_PATH = Path(settings.DATA_PATH)
+        self.swapi_client = SwapiClient(self.DATA_PATH, ["homeworld", "name", "gender"])
+        characters = [
+            {"name": "Leia Oregana", "homeworld": "Tatooine", "gender": "female"},
+            {"name": "Luke Skywalker", "homeworld": "Tatooine", "gender": "male"},
+        ]
+        self.swapi_client._save_dataset(self.DATA_PATH / "1234.csv", characters)
+
     def _create_metadata(self, filename):
         return Metadata.objects.create(
             filename=filename, download_date=datetime.datetime.now()
         )
 
     def test_succeeds(self):
-        dataset_path = download_dataset(settings.DATA_PATH)
-        self._create_metadata(dataset_path.name)
+        
+        self._create_metadata("1234.csv")
         response = self.client.get(
-            "/starwars_explorer/collections/aggregate/" + dataset_path.name + "/"
+            "/starwars_explorer/collections/aggregate/1234.csv/"
         )
         self.assertContains(response, "homeworld")
-        os.remove(dataset_path)

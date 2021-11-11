@@ -30,17 +30,17 @@ Initialization scripts should set up the application and the database.
 App is provided with some unittests, written in django testing framework. To run the tests:
 
 1. Setup virtualenv.
-2. Setup your `PYTHONPATH` to the projects directory.
-3. `python manage.py test starwars_explorer`
+2. Change `.env` file and source it `export $(grep -v '^#' .env | xargs)`
+3. Setup your `PYTHONPATH` to the projects directory.
+4. `python manage.py test starwars_explorer`
 
 ## Possible Improvments
 
 This application is a rather simple but it could be imprved in following ways:
 
 1. Rewrite frontend in React or similar modern framework.
-2. Use K8s to deploy the app.
-3. Use docker secrets to make passwords more secure.
-4. Create authentication and authorisation and create datasets per user.
-5. Create permissions to access files.
-6. Use Celery or Redis Queue to download datasets so the user does not need to wait for the fetch response.
-7. Could be rewritten as REST api for example in DRF.
+2. Use docker secrets to make passwords more secure.
+3. Create authentication and authorisation and create datasets per user.
+4. Create permissions to access files.
+5. Use Celery or Redis Queue to download datasets so the user does not need to wait for the fetch response.
+6. Could be rewritten as REST api for example in DRF.

@@ -1,9 +1,8 @@
 from django.http import HttpResponse
 from django.template import loader
-from .utils.tools import download_dataset, get_aggregated_data
+from .utils.tools import get_aggregated_data, SwapiClient
 from .models import Metadata
 import datetime
-import pytz
 from pathlib import Path
 from django.shortcuts import redirect
 from django.conf import settings
@@ -44,14 +43,14 @@ def detail(request, file_name):
 
 
 def fetch_new(request):
+    client = SwapiClient(settings.DATA_PATH, settings.USED_KEYS)
     try:
-        dataset_path = download_dataset(settings.DATA_PATH)
+        dataset_path = client.download_dataset()
         metaobject = Metadata.objects.create(
-            filename=dataset_path.name, download_date=datetime.datetime.now(pytz.utc)
+            filename=dataset_path.name, download_date=datetime.datetime.utcnow()
         )
         metaobject.save()
     except Exception as e:
-        logger.error(e)
         logger.error("Failed to downlad new dataset.")
         return HttpResponse(status=500)
     return redirect("/starwars_explorer/collections")
@@ -63,8 +62,8 @@ def aggregate(request, file_name):
 
     context = {}
     aggregate_by = {}
-    valid_keys = ["homeworld", "mass", "height", "gender"]
-    for key in valid_keys:
+    valid_aggregation_keys = settings.VALID_AGGREGATION_KEYS
+    for key in valid_aggregation_keys:
         if request.GET.get(key) == "on":
             aggregate_by[key] = True
 

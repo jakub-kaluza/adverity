@@ -4,65 +4,81 @@ import pandas as pd
 import uuid
 from pathlib import Path
 import csv
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-def download_dataset(data_path):
-    """Download new dataset from swapi
+class SwapiClient():
+    def __init__(self, data_path, used_keys):
+        self.keys_list = used_keys
+        self.data_path = data_path
+        self.num_pages = 10
 
-    Args:
-        data_path ([str]): path where new dataset should be downloaded.
+    def get_all_characters(self):
+        all_characters = []
+        pertinent_planets = set()
+        for i in range(1, self.num_pages):
+            try:
+                request_url = f"https://swapi.dev/api/people/?page={i}"
+                r = requests.get(request_url)
+                data = r.json()
+                results = data["results"]
 
-    Returns:
-        [Path]: Path object leading to the new dataset.
-    """
-    all_planets = set()
-    all_characters = []
-    keys_list = [
-        "homeworld",
-        "gender",
-        "mass",
-        "height",
-        "hair_color",
-        "skin_color",
-        "eye_color",
-        "birth_year",
-        "name",
-    ]
-    for i in range(1, 10):
-        r = requests.get(f"https://swapi.dev/api/people/?page={i}")
-        data = r.json()
-        results = data["results"]
+                for result in results:
+                    filtered_result = {key: result[key] for key in self.keys_list}
+                    planet_num = filtered_result["homeworld"].split("/")[-2]
+                    filtered_result["homeworld"] = planet_num
+                    pertinent_planets.add(planet_num)
+                    all_characters.append(filtered_result)
+            except Exception as exception:
+                logger.error("Something went wrong during reqest to %s", request_url)
+                raise exception
+        return all_characters
 
-        for result in results:
-            filtered_result = {key: result[key] for key in keys_list}
-            planet_num = filtered_result["homeworld"].split("/")[-2]
-            filtered_result["homeworld"] = planet_num
-            all_planets.add(planet_num)
-            all_characters.append(filtered_result)
+    def get_all_planets(self):
+        planet_dict = {}
+        index = 1
+        for i in range(1, self.num_pages):
+            request_url = f"https://swapi.dev/api/planets/?page={i}"
+            try:
+                r = requests.get(request_url)
+                data = r.json()
+                results = data.get("results")
+                if not results:
+                    break
+                for result in results:
+                    name = result["name"]
+                    planet_dict[index] = name
+                    index += 1
+            except Exception as exception:
+                logger.error("Something went wrong during reqest to %s", request_url)
+                raise exception
+        return planet_dict
 
-    planet_dict = {}
-    index = 1
-    for i in range(1, 10):
-        r = requests.get(f"https://swapi.dev/api/planets/?page={i}")
-        data = r.json()
-        results = data.get("results")
-        if not results:
-            break
-        for result in results:
-            name = result["name"]
-            planet_dict[index] = name
-            index += 1
+    def _filter_planet_numbers(self, characters, planet_dict):
+        for character in characters:
+            character["homeworld"] = planet_dict[int(character["homeworld"])]
+        return characters
+    
+    def _save_dataset(self, file_name, characters):
+        try:
+            with open(file_name, "w", newline="") as output_file:
+                dict_writer = csv.DictWriter(output_file, self.keys_list)
+                dict_writer.writeheader()
+                dict_writer.writerows(characters)
+        except OSError as oserror:
+            logger.error("Could not write file")
+            raise oserror 
 
-    for character in all_characters:
-        character["homeworld"] = planet_dict[int(character["homeworld"])]
-    file_name = str(uuid.uuid4()) + ".csv"
-    ch_file = Path(data_path) / file_name
-
-    with open(ch_file, "w", newline="") as output_file:
-        dict_writer = csv.DictWriter(output_file, keys_list)
-        dict_writer.writeheader()
-        dict_writer.writerows(all_characters)
-    return ch_file
+    def download_dataset(self):
+        all_characters = self.get_all_characters()
+        all_planets = self.get_all_planets()
+        all_characters = self._filter_planet_numbers(all_characters, all_planets)
+        file_name = str(uuid.uuid4()) + ".csv"
+        dataset_path = Path(self.data_path) / file_name
+        self._save_dataset(dataset_path, all_characters)
+        return dataset_path
 
 
 def get_aggregated_data(data_path, file_name, keys):

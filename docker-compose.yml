@@ -4,6 +4,11 @@ services:
   web:
     environment:
       - DATA_PATH=/data
+      - DB_NAME=starwars
+      - DB_USER=sw_app
+      - DB_PASSWORD=123456
+      - DB_PORT=5432
+      #- DB_HOST=db
     build: .
     volumes:
       - /Users/jakub/data:/data
